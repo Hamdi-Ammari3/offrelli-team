@@ -125,7 +125,7 @@ export default function TeamDashboard() {
   return (
     <div className="dashboard">
       <header className="header">
-        <h1>Offrini</h1>
+        <h1>Offrelli</h1>
       </header>
 
       <main className="container">
