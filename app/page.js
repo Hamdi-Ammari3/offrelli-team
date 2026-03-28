@@ -13,8 +13,6 @@ export default function TeamDashboard() {
   const [stores, setStores] = useState([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [plan, setPlan] = useState("basic");
-  const [fixedDiscount, setFixedDiscount] = useState("");
   const [startSubs, setStartSubs] = useState("");
   const [subsDuration, setSubsDuration] = useState("");
   const [storeSearch, setStoreSearch] = useState("");
@@ -31,6 +29,7 @@ export default function TeamDashboard() {
         id: doc.id,
         ...doc.data(),
       }));
+      console.log(data)
       setStores(data);
       setLoadingStores(false);
     };
@@ -42,11 +41,6 @@ export default function TeamDashboard() {
   const handleCreate = async () => {
     if (!name || !phone || !startSubs || !subsDuration) {
       alert("يرجى ملء جميع الحقول");
-      return;
-    }
-
-    if (plan === "basic" && !fixedDiscount) {
-      alert("يرجى تحديد نسبة التخفيض للخطة الأساسية");
       return;
     }
 
@@ -73,18 +67,13 @@ export default function TeamDashboard() {
         phone,
         username: phone,
         password: generatedPassword, 
-        plan,
+        plan:'pro',
         start_subs: Timestamp.fromDate(startDate),
         end_subs: Timestamp.fromDate(endDate),
         subs_duration: Number(subsDuration),
         created_at: serverTimestamp(),
         account_expired:false,
       };
-
-      // Only add fixed_discount if plan is basic
-      if (plan === "basic") {
-        storeData.fixed_discount = Number(fixedDiscount);
-      }
 
       //await addDoc(collection(DB, "stores"), storeData);
       await setDoc(storeRef, storeData);
@@ -100,7 +89,6 @@ export default function TeamDashboard() {
       // Reset form
       setName("");
       setPhone("");
-      setFixedDiscount("");
       setStartSubs("");
       setSubsDuration("");
 
@@ -116,8 +104,6 @@ export default function TeamDashboard() {
 
   //Statistics
   const totalStores = stores.length;
-  const proStores = stores.filter(s => s.plan === "pro").length;
-  const basicStores = stores.filter(s => s.plan === "basic").length;
   const oneMonth = stores.filter(s => s.subs_duration === 1).length;
   const sixMonths = stores.filter(s => s.subs_duration === 6).length;
   const oneYear = stores.filter(s => s.subs_duration === 12).length;
@@ -168,24 +154,6 @@ export default function TeamDashboard() {
               </div>
 
               <div>
-                <label>الخطة</label>
-                <select value={plan} onChange={(e) => setPlan(e.target.value)}>
-                  <option value="basic">basic</option>
-                  <option value="pro">pro</option>
-                </select>
-              </div>
-
-              <div>
-                <label>نسبة التخفيض (%)</label>
-                <input
-                  type="number"
-                  value={fixedDiscount}
-                  onChange={(e) => setFixedDiscount(e.target.value)}
-                  disabled={plan === "pro"}
-                />
-              </div>
-
-              <div>
                 <label>تاريخ بداية الاشتراك</label>
                 <input
                   type="date"
@@ -230,49 +198,73 @@ export default function TeamDashboard() {
                 onChange={(e) => setStoreSearch(e.target.value)}
               />
             </div>
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>الاسم</th>
-                    <th>الهاتف</th>
-                    <th>الخطة</th>
-                    <th>المدة</th>
-                    <th>نهاية الاشتراك</th>
-                    <th>كلمة المرور</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingStores ? (
+            <div className="store-list">
+              {/* Desktop Table */}
+              <div className="table-wrapper desktop-only">
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan="5" className="empty">
-                        <ClipLoader size={25} color="#000" />
-                      </td>
+                      <th>الاسم</th>
+                      <th>الهاتف</th>
+                      <th>المدة</th>
+                      <th>نهاية الاشتراك</th>
+                      <th>كلمة المرور</th>
                     </tr>
-                  ) : stores.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" className="empty">
-                        لا توجد محلات
-                      </td>
-                    </tr>
-                  ) : (
-                    stores.map((store) => (
+                  </thead>
+                  <tbody>
+                    {stores.map((store) => (
                       <tr key={store.id}>
                         <td>{store.name}</td>
                         <td>{store.phone}</td>
-                        <td>{store.plan}</td>
                         <td>{store.subs_duration} شهر</td>
                         <td>
                           {store.end_subs
                             ? dayjs(store.end_subs.toDate()).format("DD/MM/YYYY")
                             : "-"}
                         </td>
-                        <td>{store.password}</td>                      
+                        <td>{store.password}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="mobile-only">
+                {stores.map((store) => (
+                  <div key={store.id} className="store-card">
+                    <div className="store-row">
+                      <strong>{store.name}</strong>
+                      <span>الاسم</span>
+                    </div>
+
+                    <div className="store-row">
+                      <strong>{store.phone}</strong>
+                      <span>الهاتف</span>
+                    </div>
+
+                    <div className="store-row">
+                      <strong>{store.subs_duration} شهر</strong>
+                      <span>المدة</span>                    
+                    </div>
+
+                    <div className="store-row">                      
+                      <strong>
+                        {store.end_subs
+                          ? dayjs(store.end_subs.toDate()).format("DD/MM/YYYY")
+                          : "-"}
+                      </strong>
+                      <span>نهاية الاشتراك</span>
+                    </div>
+
+                    <div className="store-row">                    
+                      <strong>{store.password}</strong>
+                      <span>كلمة المرور</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
             </div>
           </section>
         )}
@@ -285,16 +277,6 @@ export default function TeamDashboard() {
               <div className="stat-box">
                 <h3>{totalStores}</h3>
                 <p>إجمالي المحلات</p>
-              </div>
-
-              <div className="stat-box">
-                <h3>{proStores}</h3>
-                <p>محلات Pro</p>
-              </div>
-
-              <div className="stat-box">
-                <h3>{basicStores}</h3>
-                <p>محلات Basic</p>
               </div>
 
               <div className="stat-box">
@@ -319,4 +301,49 @@ export default function TeamDashboard() {
     </div>
   );
 }
+
+/*
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الاسم</th>
+                    <th>الهاتف</th>
+                    <th>المدة</th>
+                    <th>نهاية الاشتراك</th>
+                    <th>كلمة المرور</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingStores ? (
+                    <tr>
+                      <td colSpan="5" className="empty">
+                        <ClipLoader size={25} color="#000" />
+                      </td>
+                    </tr>
+                  ) : stores.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="empty">
+                        لا توجد محلات
+                      </td>
+                    </tr>
+                  ) : (
+                    stores.map((store) => (
+                      <tr key={store.id}>
+                        <td>{store.name}</td>
+                        <td>{store.phone}</td>
+                        <td>{store.subs_duration} شهر</td>
+                        <td>
+                          {store.end_subs
+                            ? dayjs(store.end_subs.toDate()).format("DD/MM/YYYY")
+                            : "-"}
+                        </td>
+                        <td>{store.password}</td>                      
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+*/
 

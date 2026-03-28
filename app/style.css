@@ -157,15 +157,64 @@ td:last-child {
     margin: 5px 0 0;
     font-size: 14px;
 }
+/* Hide/show based on screen */
+.desktop-only {
+    display: block;
+}
+
+.mobile-only {
+    display: none;
+}
+
+/* Mobile styles */
 @media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .store-list-header {
+        display: flex;
+        flex-direction: row-reverse;
+        align-items: center;
+        justify-content: space-between;
+        gap:0px
+    }
+    .search-input {
+        width: 150px;
+        direction: rtl;
+        text-align: right;
+    }
+    .desktop-only {
+        display: none;
+    }
+
+    .mobile-only {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .store-card {
+        background: #f9f9f9;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .store-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    .store-row span {
+        color: #666;
+    }
+
+    .store-row strong {
+        color: #000;
+    }
 }
