@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect,useState,useRef } from "react";
 import { ClipLoader } from "react-spinners";
+import { QRCodeCanvas } from "qrcode.react";
 import { DB } from '../firebaseConfig';
-import {collection,setDoc,getDocs,getDoc,doc,Timestamp,serverTimestamp} from "firebase/firestore";
+import {collection,setDoc,getDocs,getDoc,doc,serverTimestamp} from "firebase/firestore";
 import dayjs from "dayjs";
 import "dayjs/locale/ar";
 import "./style.css";
@@ -13,10 +14,10 @@ export default function TeamDashboard() {
   const [stores, setStores] = useState([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [startSubs, setStartSubs] = useState("");
-  const [subsDuration, setSubsDuration] = useState("");
+  const [cardsNumber, setCardsNumber] = useState("");
   const [storeSearch, setStoreSearch] = useState("");
   const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const [selectedStore, setSelectedStore] = useState(null);
 
   dayjs.locale("ar");
 
@@ -37,10 +38,25 @@ export default function TeamDashboard() {
     fetchStores();
   }, []);
 
+  //Validate phone number
+  const validateTunisianPhone = (phone) => {
+    const cleanPhone = phone.trim();
+
+    // Must be exactly 8 digits
+    const regex = /^[2-9]\d{7}$/;
+
+    return regex.test(cleanPhone);
+  };
+
   //Create new store
   const handleCreate = async () => {
-    if (!name || !phone || !startSubs || !subsDuration) {
+    if (!name || !phone || !cardsNumber) {
       alert("يرجى ملء جميع الحقول");
+      return;
+    }
+
+    if (!validateTunisianPhone(phone)) {
+      alert("رقم الهاتف غير صالح (يجب أن يكون 8 أرقام)");
       return;
     }
 
@@ -56,23 +72,19 @@ export default function TeamDashboard() {
         return;
       }
 
-      const startDate = new Date(startSubs);
-      const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + Number(subsDuration));
-
       const generatedPassword = Math.floor(100000 + Math.random() * 900000).toString();
+      const orderedCards = Number(cardsNumber);
+      const bonusCards = 10;
 
       const storeData = {
         name,
         phone,
         username: phone,
         password: generatedPassword, 
-        plan:'pro',
-        start_subs: Timestamp.fromDate(startDate),
-        end_subs: Timestamp.fromDate(endDate),
-        subs_duration: Number(subsDuration),
+        cards_limit: Number(orderedCards + bonusCards),
+        codes_generated: 0,
         created_at: serverTimestamp(),
-        account_expired:false,
+        account_banned:false,
       };
 
       //await addDoc(collection(DB, "stores"), storeData);
@@ -89,8 +101,7 @@ export default function TeamDashboard() {
       // Reset form
       setName("");
       setPhone("");
-      setStartSubs("");
-      setSubsDuration("");
+      setCardsNumber("");
 
       alert("تم إنشاء المحل بنجاح");
 
@@ -102,11 +113,24 @@ export default function TeamDashboard() {
     }
   };
 
+  //Qr code generate
+  const qrRef = useRef(null);
+  const baseUrl = 'https://offrelli.com';
+
+  const handleDownloadQR = () => {
+    const canvas = qrRef.current?.querySelector("canvas");
+    if (!canvas) return;
+
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `offrini-${selectedStore?.name}.png`;
+    a.click();
+  };
+
   //Statistics
   const totalStores = stores.length;
-  const oneMonth = stores.filter(s => s.subs_duration === 1).length;
-  const sixMonths = stores.filter(s => s.subs_duration === 6).length;
-  const oneYear = stores.filter(s => s.subs_duration === 12).length;
+  const totalCards = stores.reduce((sum, s) => sum + (s.cards_limit || 0), 0);
 
   return (
     <div className="dashboard">
@@ -154,21 +178,18 @@ export default function TeamDashboard() {
               </div>
 
               <div>
-                <label>تاريخ بداية الاشتراك</label>
-                <input
-                  type="date"
-                  value={startSubs}
-                  onChange={(e) => setStartSubs(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label>مدة الاشتراك (بالأشهر)</label>
-                <input
-                  type="number"
-                  value={subsDuration}
-                  onChange={(e) => setSubsDuration(e.target.value)}
-                />
+                <label>عدد البطاقات</label>
+                <select
+                  value={cardsNumber}
+                  onChange={(e) => setCardsNumber(e.target.value)}
+                >
+                  <option value="">اختر العدد</option>
+                  {[100,200,300,400,500,600,700,800,900,1000].map(num => (
+                    <option key={num} value={num}>
+                      {num} بطاقة
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="primary-btn-container">
@@ -199,6 +220,7 @@ export default function TeamDashboard() {
               />
             </div>
             <div className="store-list">
+
               {/* Desktop Table */}
               <div className="table-wrapper desktop-only">
                 <table>
@@ -206,9 +228,10 @@ export default function TeamDashboard() {
                     <tr>
                       <th>الاسم</th>
                       <th>الهاتف</th>
-                      <th>المدة</th>
-                      <th>نهاية الاشتراك</th>
+                      <th>البطاقات الجملية</th>
+                      <th>البطاقات المستعملة</th>
                       <th>كلمة المرور</th>
+                      <th>QR Code</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -216,13 +239,17 @@ export default function TeamDashboard() {
                       <tr key={store.id}>
                         <td>{store.name}</td>
                         <td>{store.phone}</td>
-                        <td>{store.subs_duration} شهر</td>
-                        <td>
-                          {store.end_subs
-                            ? dayjs(store.end_subs.toDate()).format("DD/MM/YYYY")
-                            : "-"}
-                        </td>
+                        <td>{store.cards_limit}</td>
+                        <td>{store.codes_generated}</td>
                         <td>{store.password}</td>
+                        <td>
+                          <button
+                            className="qr-btn"
+                            onClick={() => setSelectedStore(store)}
+                          >
+                            📱
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -244,28 +271,57 @@ export default function TeamDashboard() {
                     </div>
 
                     <div className="store-row">
-                      <strong>{store.subs_duration} شهر</strong>
-                      <span>المدة</span>                    
+                      <strong>{store.cards_limit}</strong>
+                      <span>البطاقات الجملية</span>               
                     </div>
 
-                    <div className="store-row">                      
-                      <strong>
-                        {store.end_subs
-                          ? dayjs(store.end_subs.toDate()).format("DD/MM/YYYY")
-                          : "-"}
-                      </strong>
-                      <span>نهاية الاشتراك</span>
+                    <div className="store-row">
+                      <strong>{store.codes_generated}</strong>
+                      <span>البطاقات المستعملة</span>               
                     </div>
 
                     <div className="store-row">                    
                       <strong>{store.password}</strong>
                       <span>كلمة المرور</span>
                     </div>
+
+                    <div className="store-row">
+                      <button
+                        className="qr-btn"
+                        onClick={() => setSelectedStore(store)}
+                      >
+                        📱
+                      </button>
+                      <span>QR Code</span>
+                    </div>
                   </div>
                 ))}
               </div>
-
             </div>
+
+            {selectedStore && (
+              <div className="qr-modal-overlay">
+                <div className="qr-modal">
+                  <h4>{selectedStore.name}</h4>
+                  <div ref={qrRef} className="qr-wrapper">
+                    <QRCodeCanvas
+                      value={`${baseUrl}/s/${selectedStore.id}`}
+                      size={220}
+                    />
+                  </div>
+                  <button
+                    className="close-btn"
+                    onClick={() => setSelectedStore(null)}
+                  >
+                   إغلاق
+                  </button>
+                  <button className="primary-btn" onClick={handleDownloadQR}>
+                   تحميل QR
+                  </button>
+                </div>
+              </div>
+            )}
+
           </section>
         )}
 
@@ -280,70 +336,13 @@ export default function TeamDashboard() {
               </div>
 
               <div className="stat-box">
-                <h3>{oneMonth}</h3>
-                <p>اشتراك شهر واحد</p>
-              </div>
-
-              <div className="stat-box">
-                <h3>{sixMonths}</h3>
-                <p>اشتراك 6 أشهر</p>
-              </div>
-
-              <div className="stat-box">
-                <h3>{oneYear}</h3>
-                <p>اشتراك سنة</p>
+                <h3>{totalCards}</h3>
+                <p>إجمالي البطاقات</p>
               </div>
             </div>
           </section>
         )}
-
       </main>
     </div>
   );
 }
-
-/*
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>الاسم</th>
-                    <th>الهاتف</th>
-                    <th>المدة</th>
-                    <th>نهاية الاشتراك</th>
-                    <th>كلمة المرور</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingStores ? (
-                    <tr>
-                      <td colSpan="5" className="empty">
-                        <ClipLoader size={25} color="#000" />
-                      </td>
-                    </tr>
-                  ) : stores.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" className="empty">
-                        لا توجد محلات
-                      </td>
-                    </tr>
-                  ) : (
-                    stores.map((store) => (
-                      <tr key={store.id}>
-                        <td>{store.name}</td>
-                        <td>{store.phone}</td>
-                        <td>{store.subs_duration} شهر</td>
-                        <td>
-                          {store.end_subs
-                            ? dayjs(store.end_subs.toDate()).format("DD/MM/YYYY")
-                            : "-"}
-                        </td>
-                        <td>{store.password}</td>                      
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-*/
-
