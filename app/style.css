@@ -72,6 +72,24 @@ body {
     display: flex;
     flex-direction: column;
 }
+.profile-form-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+.profile-form-grid-box {
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+.profile-form-grid > input {
+    width: 400px;
+    text-align: center;
+}
 label {
     margin-bottom: 5px;
     font-size: 14px;
